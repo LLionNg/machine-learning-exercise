@@ -1,0 +1,29 @@
+{
+  "id": "challenge-6-pytorch-sequential",
+  "title": "Building a Model with torch.nn.Sequential",
+  "short_description": "Compose a regression MLP with nn.Sequential (no subclass) and run inference correctly with eval mode and torch.no_grad. Verified by structure, forward shape, and gradient flow.",
+  "difficulty": "Beginner",
+  "category": "deep-learning",
+  "estimated_time": "25-35 min",
+  "learning_objectives": [
+    "Compose a network from a list of layers with nn.Sequential",
+    "Place activations correctly between Linear layers",
+    "Reason about layer shapes and parameter counts",
+    "Run inference with model.eval() and torch.no_grad()",
+    "Know when to reach for Sequential vs subclassing nn.Module"
+  ],
+  "prerequisites": [
+    "Challenge 3 (A Small Neural Network in PyTorch) or equivalent"
+  ],
+  "tags": ["pytorch", "nn-sequential", "mlp", "inference", "deep-learning"],
+  "packages": {
+    "torch": ">=2,<3",
+    "pytest": ">=7"
+  },
+  "solution_file": "solution.py",
+  "test_file": "test_solution.py",
+  "test_command": "pytest -v",
+  "test_count": 8,
+  "gpu_required": false,
+  "order": 6
+}

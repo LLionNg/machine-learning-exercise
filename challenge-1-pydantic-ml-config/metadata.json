@@ -1,0 +1,30 @@
+{
+  "id": "challenge-1-pydantic-ml-config",
+  "title": "Pydantic Models for an ML Training Config",
+  "short_description": "Validate a deep-learning training configuration with Pydantic v2 field constraints, Literal enums, and custom validators.",
+  "difficulty": "Beginner",
+  "category": "data-validation",
+  "estimated_time": "30-45 min",
+  "learning_objectives": [
+    "Declare typed Pydantic v2 models with BaseModel",
+    "Enforce numeric and length constraints with Field",
+    "Restrict values with Literal types",
+    "Validate nested models and lists",
+    "Write field_validator (before) and model_validator (after)",
+    "Understand when ValidationError is raised and how to serialize models"
+  ],
+  "prerequisites": [
+    "Basic Python classes and type hints"
+  ],
+  "tags": ["pydantic", "validation", "config", "machine-learning"],
+  "packages": {
+    "pydantic": ">=2,<3",
+    "pytest": ">=7"
+  },
+  "solution_file": "solution.py",
+  "test_file": "test_solution.py",
+  "test_command": "pytest -v",
+  "test_count": 34,
+  "gpu_required": false,
+  "order": 1
+}

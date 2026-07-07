@@ -1,0 +1,30 @@
+{
+  "id": "challenge-5-tensorflow-gradienttape",
+  "title": "A Neural Network from Scratch with TensorFlow GradientTape",
+  "short_description": "Train an MLP by hand in TensorFlow -- tf.Variable weights, your own matmuls, and manual gradient descent with tf.GradientTape and assign_sub. No Keras layers, no optimizer, no model.fit.",
+  "difficulty": "Beginner-Intermediate",
+  "category": "deep-learning",
+  "estimated_time": "40-50 min",
+  "learning_objectives": [
+    "Create trainable state with tf.Variable",
+    "Write a forward pass by hand with matrix multiplication and sigmoid",
+    "Record a computation with tf.GradientTape and get gradients via tape.gradient",
+    "Run gradient descent manually with Variable.assign_sub",
+    "Contrast eager GradientTape training with a PyTorch autograd loop"
+  ],
+  "prerequisites": [
+    "Challenge 4 (PyTorch autograd from scratch) -- this is the TensorFlow counterpart",
+    "Basic Python"
+  ],
+  "tags": ["tensorflow", "gradienttape", "from-scratch", "gradient-descent", "mlp", "deep-learning"],
+  "packages": {
+    "tensorflow": ">=2.16,<3",
+    "pytest": ">=7"
+  },
+  "solution_file": "solution.py",
+  "test_file": "test_solution.py",
+  "test_command": "pytest -v",
+  "test_count": 9,
+  "gpu_required": false,
+  "order": 5
+}

@@ -1,0 +1,30 @@
+{
+  "id": "challenge-2-tensor-operations",
+  "title": "PyTorch Tensor Operations",
+  "short_description": "Learn what a tensor is and practise the core operations -- creation, shape, reshape, indexing, reduction, broadcasting, and matrix multiplication.",
+  "difficulty": "Beginner",
+  "category": "deep-learning",
+  "estimated_time": "30-45 min",
+  "learning_objectives": [
+    "Understand what a tensor is (an n-dimensional array with a shape and dtype)",
+    "Create tensors and inspect shape, ndim, numel, and dtype",
+    "Reshape tensors and index rows/columns",
+    "Reduce along a dimension (row sums)",
+    "Use broadcasting to combine tensors of different shapes",
+    "Tell matrix multiplication apart from element-wise multiplication"
+  ],
+  "prerequisites": [
+    "Basic Python and lists"
+  ],
+  "tags": ["pytorch", "tensor", "basics", "numpy"],
+  "packages": {
+    "torch": ">=2,<3",
+    "pytest": ">=8"
+  },
+  "solution_file": "solution.py",
+  "test_file": "test_solution.py",
+  "test_command": "pytest -v",
+  "test_count": 11,
+  "gpu_required": false,
+  "order": 2
+}

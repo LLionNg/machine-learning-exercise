@@ -1,0 +1,30 @@
+{
+  "id": "challenge-7-keras-sequential",
+  "title": "Building and Training a Model with keras.Sequential",
+  "short_description": "Build a regression MLP with keras.Sequential, configure training with compile (MSE + SGD), and train it with fit. The Keras counterpart to the PyTorch Sequential challenge.",
+  "difficulty": "Beginner",
+  "category": "deep-learning",
+  "estimated_time": "30-40 min",
+  "learning_objectives": [
+    "Compose a network from a list of layers with keras.Sequential",
+    "Use Dense layers and set activations",
+    "Configure training with model.compile (loss + optimizer)",
+    "Train with model.fit and read the loss history",
+    "Contrast Keras compile/fit with a hand-written PyTorch loop"
+  ],
+  "prerequisites": [
+    "Challenge 5 (TensorFlow GradientTape) or basic TensorFlow",
+    "Challenge 6 (torch.nn.Sequential) as the PyTorch counterpart"
+  ],
+  "tags": ["tensorflow", "keras", "sequential", "compile-fit", "mlp", "deep-learning"],
+  "packages": {
+    "tensorflow": ">=2.16,<3",
+    "pytest": ">=7"
+  },
+  "solution_file": "solution.py",
+  "test_file": "test_solution.py",
+  "test_command": "pytest -v",
+  "test_count": 8,
+  "gpu_required": false,
+  "order": 7
+}

@@ -1,0 +1,33 @@
+[project]
+name = "ml-practice"
+version = "0.1.0"
+description = "Self-hosted ML/DL coding-challenge practice grader (web UI + pytest grader)"
+requires-python = ">=3.11"
+dependencies = [
+    # Web platform
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.34.0",
+    "python-multipart>=0.0.12",
+    "markdown>=3.7",
+    # Needed to run/grade the challenges
+    "pydantic>=2.10",
+    "torch>=2.6",
+    "tensorflow>=2.16,<3",
+    "numpy>=1.26",
+    "pytest>=8.3",
+    "pygments>=2.20.0",
+]
+
+[tool.uv]
+# This repo is a workspace of scripts + challenges, not an installable package.
+package = false
+
+# Pull torch from the CPU-only wheel index (smaller, no CUDA - the challenges
+# are CPU-only).
+[tool.uv.sources]
+torch = [{ index = "pytorch-cpu" }]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true

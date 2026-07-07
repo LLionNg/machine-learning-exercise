@@ -1,0 +1,30 @@
+{
+  "id": "challenge-4-pytorch-autograd",
+  "title": "A Neural Network from Scratch with PyTorch Autograd",
+  "short_description": "Train an MLP by hand -- raw requires_grad tensors, your own matmuls, and manual gradient descent with loss.backward() and a no_grad() update. No nn.Module, no optimizer.",
+  "difficulty": "Beginner-Intermediate",
+  "category": "deep-learning",
+  "estimated_time": "40-50 min",
+  "learning_objectives": [
+    "Create leaf tensors with requires_grad=True",
+    "Write a forward pass by hand with matrix multiplication and sigmoid",
+    "Understand what loss.backward() computes and where it stores gradients",
+    "Run gradient descent manually inside torch.no_grad()",
+    "Know why you must call grad.zero_() every step"
+  ],
+  "prerequisites": [
+    "Challenge 2 (PyTorch tensor operations) or equivalent",
+    "Challenge 3 (A Small Neural Network in PyTorch) helps but is not required"
+  ],
+  "tags": ["pytorch", "autograd", "from-scratch", "gradient-descent", "mlp", "deep-learning"],
+  "packages": {
+    "torch": ">=2,<3",
+    "pytest": ">=7"
+  },
+  "solution_file": "solution.py",
+  "test_file": "test_solution.py",
+  "test_command": "pytest -v",
+  "test_count": 9,
+  "gpu_required": false,
+  "order": 4
+}

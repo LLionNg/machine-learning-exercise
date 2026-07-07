@@ -1,0 +1,30 @@
+{
+  "id": "challenge-3-pytorch-neural-network",
+  "title": "A Small Neural Network in PyTorch",
+  "short_description": "Build a 2-layer MLP and verify it works via forward-pass shape, gradient flow, and a short loss decrease -- no GPU, no training to convergence.",
+  "difficulty": "Beginner-Intermediate",
+  "category": "deep-learning",
+  "estimated_time": "40-50 min",
+  "learning_objectives": [
+    "Subclass nn.Module and define layers + forward",
+    "Use nn.Linear and nn.ReLU and understand why non-linearity is needed",
+    "Verify a model via forward-pass shape/finiteness and gradient flow",
+    "Write a training loop: zero_grad, backward, step",
+    "Use BCEWithLogitsLoss and an Adam optimizer"
+  ],
+  "prerequisites": [
+    "Challenge 2 (PyTorch tensor operations) or equivalent",
+    "Basic Python classes"
+  ],
+  "tags": ["pytorch", "neural-network", "mlp", "xor", "deep-learning"],
+  "packages": {
+    "torch": ">=2,<3",
+    "pytest": ">=7"
+  },
+  "solution_file": "solution.py",
+  "test_file": "test_solution.py",
+  "test_command": "pytest -v",
+  "test_count": 9,
+  "gpu_required": false,
+  "order": 3
+}
