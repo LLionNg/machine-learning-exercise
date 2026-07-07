@@ -1,8 +1,10 @@
 """Read per-challenge SCOREBOARD.md files and aggregate a main leaderboard.
 
-Writing the scoreboards (which runs the grader on every submission) lives in
-`scripts/update_scoreboards.py`; this module only *reads* them, so the API stays
-fast.
+`challenge_scoreboard`/`leaderboard` only *read* the files, so browsing stays
+fast. `regenerate_scoreboard` is the one place that grades submissions and
+rewrites a SCOREBOARD.md -- called synchronously after a save (see
+`app.main.api_save`) so the board updates immediately, and by
+`scripts/update_scoreboards.py` for batch/CI regeneration.
 """
 
 from __future__ import annotations
@@ -43,6 +45,36 @@ def challenge_scoreboard(challenge_id: str) -> list[dict]:
         if r["username"].lower() not in _HIDDEN_USERS
     ]
     rows.sort(key=lambda r: (-r["passed"], r["username"].lower()))
+    return rows
+
+
+def regenerate_scoreboard(challenge_id: str) -> list[dict]:
+    """Grade every submission for `challenge_id` and rewrite its SCOREBOARD.md."""
+    from .grader import grade  # local import: keeps the read path grader-free
+
+    challenge_dir = REPO_ROOT / challenge_id
+    submissions_root = challenge_dir / "submissions"
+
+    rows: list[dict] = []
+    if submissions_root.is_dir():
+        for user_dir in sorted(submissions_root.iterdir()):
+            solution = user_dir / "solution.py"
+            if not solution.is_file():
+                continue
+            result = grade(challenge_id, solution.read_text(encoding="utf-8"))
+            rows.append(
+                {"username": user_dir.name, "passed": result["passed"], "total": result["total"]}
+            )
+
+    rows.sort(key=lambda r: (-r["passed"], r["username"].lower()))
+
+    lines = [
+        f"# Scoreboard for {challenge_id}",
+        "| Username | Passed Tests | Total Tests |",
+        "|----------|--------------|-------------|",
+    ]
+    lines += [f"| {r['username']} | {r['passed']} | {r['total']} |" for r in rows]
+    (challenge_dir / "SCOREBOARD.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
     return rows
 
 

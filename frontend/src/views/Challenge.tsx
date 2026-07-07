@@ -175,6 +175,9 @@ export default function Challenge({
       if (asSubmit && r.ok && username.trim()) {
         try {
           setSaved(await api.save(id, username.trim(), code))
+          // The save just regraded and rewrote this challenge's scoreboard --
+          // pull the fresh rows so the Scoreboard tab reflects it immediately.
+          api.scoreboard(id).then(setScores).catch(() => {})
         } catch {
           // leave `saved` null -- the manual "Save to filesystem" button remains
         }
@@ -190,6 +193,7 @@ export default function Challenge({
     if (!username.trim()) return
     try {
       setSaved(await api.save(id, username.trim(), code))
+      api.scoreboard(id).then(setScores).catch(() => {})
     } catch {
       setSaved(null)
     }

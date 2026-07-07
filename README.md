@@ -89,8 +89,27 @@ app/            FastAPI backend
   scoreboard.py   read SCOREBOARD.md files, aggregate the leaderboard
   main.py         API routes + serves frontend/dist
 frontend/       React + Vite + Tailwind + shadcn/ui (neutral theme, light/dark)
-scripts/        update_scoreboards.py (batch grader)
+scripts/        update_scoreboards.py (batch grader), grade_submission.py (one-user CI grader)
 ```
+
+## Contribution flow (CI)
+
+Like [go-interview-practice](https://github.com/RezaSi/go-interview-practice), submissions
+land via fork + PR and the repo automates the rest with GitHub Actions:
+
+- **`.github/workflows/pr-tests.yml`** - on every PR to `main`: checks the PR only touches
+  `challenge-*/submissions/<pr-author>/` (files elsewhere need a maintainer to add the
+  `manual-approval-granted` label), then runs `scripts/grade_submission.py` for each changed
+  challenge. The final `pr-status` job is the single check to require in branch protection.
+- **`.github/workflows/auto-merge.yml`** - every 2 hours, squash-merges any open PR whose
+  `pr-status` check has been green for 2+ days (tweak `WAIT_MS` in the workflow to change the
+  wait), then regenerates scoreboards for the challenges it touched.
+- **`.github/workflows/update-scoreboards.yml`** - on any direct push to `main` under
+  `challenge-*/submissions/**` (e.g. a maintainer merging manually), regenerates the affected
+  `SCOREBOARD.md` files via `scripts/update_scoreboards.py` and commits them back.
+
+All three commit as `github-actions[bot]`; no extra secrets are needed beyond the default
+`GITHUB_TOKEN`.
 
 ## Requirements
 

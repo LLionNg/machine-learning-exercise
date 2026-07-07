@@ -1,0 +1,157 @@
+name: PR Tests
+
+permissions:
+  contents: read
+
+on:
+  pull_request:
+    branches:
+      - main
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - labeled
+
+jobs:
+  validate-submission-security:
+    runs-on: ubuntu-latest
+    name: Validate Submission Security
+    outputs:
+      validation_passed: ${{ steps.validate.outputs.validation_passed }}
+      manual_approval_needed: ${{ steps.validate.outputs.manual_approval_needed }}
+      changed_challenges: ${{ steps.validate.outputs.changed_challenges }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Validate changed files
+        id: validate
+        run: |
+          USERNAME_LOWER=$(echo "${{ github.event.pull_request.user.login }}" | tr '[:upper:]' '[:lower:]')
+          echo "PR author (normalized): $USERNAME_LOWER"
+
+          git fetch origin main
+          CHANGED_FILES=$(git diff --name-only origin/main...HEAD)
+          echo "Changed files:"
+          echo "$CHANGED_FILES"
+
+          NON_SUBMISSION_FILES=$(echo "$CHANGED_FILES" | grep -v -E '^challenge-[0-9]+-[^/]+/submissions/' || true)
+
+          MANUAL_APPROVAL_GRANTED="false"
+          if [[ "${{ contains(github.event.pull_request.labels.*.name, 'manual-approval-granted') }}" == "true" ]]; then
+            MANUAL_APPROVAL_GRANTED="true"
+            echo "Manual approval granted via label"
+          fi
+
+          if [ -n "$NON_SUBMISSION_FILES" ] && [ "$MANUAL_APPROVAL_GRANTED" != "true" ]; then
+            echo "PR touches files outside challenge-*/submissions/:"
+            echo "$NON_SUBMISSION_FILES"
+            echo "manual_approval_needed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "manual_approval_needed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+          CHANGED_CHALLENGES=$(echo "$CHANGED_FILES" | grep -E '^challenge-[0-9]+-[^/]+/submissions/' | cut -d'/' -f1 | sort -u || true)
+          if [ -n "$CHANGED_CHALLENGES" ]; then
+            CHALLENGES_JSON=$(echo "$CHANGED_CHALLENGES" | sed 's/^/"/;s/$/"/' | paste -sd, -)
+            echo "changed_challenges=[$CHALLENGES_JSON]" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed_challenges=[]" >> "$GITHUB_OUTPUT"
+          fi
+
+          INVALID_FILES=""
+          while IFS= read -r FILE; do
+            [ -n "$FILE" ] || continue
+            if [[ "$FILE" =~ ^challenge-[0-9]+-[^/]+/submissions/([^/]+)/ ]]; then
+              SUBMISSION_USER_LOWER=$(echo "${BASH_REMATCH[1]}" | tr '[:upper:]' '[:lower:]')
+              if [ "$SUBMISSION_USER_LOWER" != "$USERNAME_LOWER" ]; then
+                INVALID_FILES="$INVALID_FILES $FILE"
+              fi
+            fi
+          done <<< "$CHANGED_FILES"
+
+          if [ -n "$INVALID_FILES" ] && [ "$MANUAL_APPROVAL_GRANTED" != "true" ]; then
+            echo "STRICT SECURITY VIOLATION: modified another user's submission directory:$INVALID_FILES"
+            echo "You can only submit to challenge-*/submissions/$USERNAME_LOWER"
+            echo "validation_passed=false" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+
+          if [ -n "$NON_SUBMISSION_FILES" ] && [ "$MANUAL_APPROVAL_GRANTED" != "true" ]; then
+            echo "validation_passed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "validation_passed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  manual-approval-status:
+    runs-on: ubuntu-latest
+    needs: validate-submission-security
+    if: needs.validate-submission-security.outputs.manual_approval_needed == 'true'
+
+    steps:
+      - name: Manual approval required
+        run: |
+          echo "This PR touches files outside challenge-*/submissions/<your-username>/."
+          echo "A maintainer must review it and add the 'manual-approval-granted' label, then re-run this workflow."
+          exit 1
+
+  test-submissions:
+    runs-on: ubuntu-latest
+    needs: validate-submission-security
+    if: needs.validate-submission-security.outputs.validation_passed == 'true' && needs.validate-submission-security.outputs.changed_challenges != '[]'
+
+    strategy:
+      matrix:
+        challenge: ${{ fromJson(needs.validate-submission-security.outputs.changed_challenges) }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Grade ${{ matrix.challenge }}
+        run: uv run python scripts/grade_submission.py "${{ matrix.challenge }}" "${{ github.event.pull_request.user.login }}"
+
+  # Final gatekeeper job - this is the single required status check for branch protection
+  pr-status:
+    runs-on: ubuntu-latest
+    needs: [validate-submission-security, manual-approval-status, test-submissions]
+    if: always()
+
+    steps:
+      - name: Check all job results
+        run: |
+          echo "validate-submission-security: ${{ needs.validate-submission-security.result }}"
+          echo "manual-approval-status: ${{ needs.manual-approval-status.result }}"
+          echo "test-submissions: ${{ needs.test-submissions.result }}"
+
+          if [ "${{ needs.validate-submission-security.result }}" == "failure" ]; then
+            echo "Security validation failed"
+            exit 1
+          fi
+
+          if [ "${{ needs.manual-approval-status.result }}" == "failure" ]; then
+            echo "Manual approval is required for this PR"
+            exit 1
+          fi
+
+          if [ "${{ needs.test-submissions.result }}" == "failure" ]; then
+            echo "Tests failed"
+            exit 1
+          fi
+
+          echo "All checks passed - PR is ready for merge"
