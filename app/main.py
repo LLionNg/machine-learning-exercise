@@ -14,7 +14,7 @@ from pydantic import BaseModel
 from .challenges import get_challenge, list_challenges
 from .config import REPO_ROOT
 from .grader import grade, safe_challenge_dir
-from .scoreboard import challenge_scoreboard, leaderboard, regenerate_scoreboard
+from .scoreboard import challenge_scoreboard, leaderboard, record_live_result
 
 app = FastAPI(title="ML Practice")
 
@@ -171,9 +171,12 @@ def api_save(req: SaveRequest) -> dict:
     submission_dir = d / "submissions" / username
     submission_dir.mkdir(parents=True, exist_ok=True)
     (submission_dir / "solution.py").write_text(req.code, encoding="utf-8")
-    # Regrade and rewrite this challenge's scoreboard synchronously, so it's
-    # visible to everyone immediately -- no restart or manual script needed.
-    regenerate_scoreboard(req.challengeId)
+    # Grade and record the result in the in-memory live scoreboard, so it's
+    # visible immediately to anyone browsing this running instance. The
+    # git-tracked SCOREBOARD.md is untouched -- it's only rewritten by
+    # scripts/update_scoreboards.py, so a PR never needs to include it.
+    result = grade(req.challengeId, req.code)
+    record_live_result(req.challengeId, username, result["passed"], result["total"])
     rel = f"{req.challengeId}/submissions/{username}/solution.py"
     return {
         "success": True,

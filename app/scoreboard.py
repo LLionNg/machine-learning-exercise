@@ -1,10 +1,14 @@
 """Read per-challenge SCOREBOARD.md files and aggregate a main leaderboard.
 
-`challenge_scoreboard`/`leaderboard` only *read* the files, so browsing stays
-fast. `regenerate_scoreboard` is the one place that grades submissions and
-rewrites a SCOREBOARD.md -- called synchronously after a save (see
-`app.main.api_save`) so the board updates immediately, and by
-`scripts/update_scoreboards.py` for batch/CI regeneration.
+The web app never writes SCOREBOARD.md itself (same as go-interview-practice):
+that file is git-tracked and only ever rewritten by `scripts/update_scoreboards.py`,
+run locally or by CI after a merge. That keeps a contributor's PR from ever
+touching a shared generated file -- it only ever adds their own submission.
+
+Instead, `app.main.api_save` records a result in `_LIVE` below, an in-memory
+overlay that `challenge_scoreboard`/`leaderboard` merge in on read. This makes
+a save show up immediately for anyone browsing the same running instance,
+without persisting to disk; it resets when the server restarts.
 """
 
 from __future__ import annotations
@@ -20,6 +24,18 @@ _ROW_RE = re.compile(r"^\|\s*([^|]+?)\s*\|\s*(\d+)\s*\|\s*(\d+)\s*\|")
 # Pseudo-users that hold the maintainer's answer-key solutions -- kept for
 # grading/verification but hidden from the public leaderboard and scoreboards.
 _HIDDEN_USERS = {"reference"}
+
+# In-memory overlay: challenge_id -> username -> {"username", "passed", "total"}.
+# Not persisted -- see the module docstring.
+_LIVE: dict[str, dict[str, dict]] = {}
+
+
+def record_live_result(challenge_id: str, username: str, passed: int, total: int) -> None:
+    _LIVE.setdefault(challenge_id, {})[username] = {
+        "username": username,
+        "passed": passed,
+        "total": total,
+    }
 
 
 def parse_scoreboard(path: Path) -> list[dict]:
@@ -39,17 +55,25 @@ def parse_scoreboard(path: Path) -> list[dict]:
 
 
 def challenge_scoreboard(challenge_id: str) -> list[dict]:
-    rows = [
-        r
+    rows_by_user = {
+        r["username"]: r
         for r in parse_scoreboard(REPO_ROOT / challenge_id / "SCOREBOARD.md")
         if r["username"].lower() not in _HIDDEN_USERS
-    ]
+    }
+    for username, r in _LIVE.get(challenge_id, {}).items():
+        if username.lower() not in _HIDDEN_USERS:
+            rows_by_user[username] = r
+    rows = list(rows_by_user.values())
     rows.sort(key=lambda r: (-r["passed"], r["username"].lower()))
     return rows
 
 
 def regenerate_scoreboard(challenge_id: str) -> list[dict]:
-    """Grade every submission for `challenge_id` and rewrite its SCOREBOARD.md."""
+    """Grade every submission for `challenge_id` and rewrite its SCOREBOARD.md.
+
+    Used by `scripts/update_scoreboards.py` (local batch runs and CI) -- never
+    called from the web app's request handlers.
+    """
     from .grader import grade  # local import: keeps the read path grader-free
 
     challenge_dir = REPO_ROOT / challenge_id
