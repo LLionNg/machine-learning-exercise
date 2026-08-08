@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
     inputs:
       challenge_name:
-        description: 'Specific challenge to update (e.g. challenge-3-pytorch-neural-network). Leave empty to detect from the last commit.'
+        description: 'Space-separated challenges to update (e.g. challenge-3-pytorch-neural-network). Leave empty to regenerate every scoreboard.'
         required: false
         type: string
 
@@ -30,7 +30,9 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 2
+          # Full history: the detect step diffs the whole pushed range, whose
+          # start commit can be further back than a shallow clone reaches.
+          fetch-depth: 0
 
       - name: Install uv
         uses: astral-sh/setup-uv@v3
@@ -42,22 +44,52 @@ jobs:
 
       - name: Detect changed challenges
         id: detect
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_CHALLENGES: ${{ github.event.inputs.challenge_name }}
+          BEFORE_SHA: ${{ github.event.before }}
+          AFTER_SHA: ${{ github.sha }}
         run: |
-          if [ -n "${{ github.event.inputs.challenge_name }}" ]; then
-            CHANGED="${{ github.event.inputs.challenge_name }}"
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            if [ -n "$INPUT_CHALLENGES" ]; then
+              CHANGED="$INPUT_CHALLENGES"
+            else
+              # Manual run with no challenge named: regenerate everything. This
+              # is the repair path when a push-triggered run missed something.
+              echo "Manual run with no challenge named - regenerating all scoreboards"
+              echo "has_changes=true" >> "$GITHUB_OUTPUT"
+              echo "challenges=" >> "$GITHUB_OUTPUT"
+              echo "label=all challenges" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
           else
-            CHANGED=$(git diff --name-only HEAD~1 HEAD | grep -E '^challenge-[0-9]+-[^/]+/submissions/' | cut -d'/' -f1 | sort -u || true)
+            # Diff the whole pushed range rather than HEAD~1..HEAD. When the tip
+            # of the push is a merge commit, HEAD~1 is only its first parent, so
+            # a submission that arrived on the other parent is invisible and its
+            # scoreboard silently never gets regenerated.
+            RANGE_START="$BEFORE_SHA"
+            if [ -z "$RANGE_START" ] \
+              || [ "$RANGE_START" = "0000000000000000000000000000000000000000" ] \
+              || ! git cat-file -e "${RANGE_START}^{commit}" 2>/dev/null; then
+              echo "Push 'before' sha unusable ($RANGE_START), falling back to the first parent"
+              RANGE_START="${AFTER_SHA}^"
+            fi
+            echo "Diffing $RANGE_START..$AFTER_SHA"
+            CHANGED=$(git diff --name-only "$RANGE_START" "$AFTER_SHA" | grep -E '^challenge-[0-9]+-[^/]+/submissions/' | cut -d'/' -f1 | sort -u || true)
           fi
 
           if [ -z "$CHANGED" ]; then
             echo "No challenge submissions were modified"
             echo "has_changes=false" >> "$GITHUB_OUTPUT"
           else
-            echo "Challenges with submission changes: $CHANGED"
+            CHALLENGES=$(echo "$CHANGED" | tr '\n' ' ')
+            echo "Challenges with submission changes: $CHALLENGES"
             echo "has_changes=true" >> "$GITHUB_OUTPUT"
-            echo "challenges=$(echo "$CHANGED" | tr '\n' ' ')" >> "$GITHUB_OUTPUT"
+            echo "challenges=$CHALLENGES" >> "$GITHUB_OUTPUT"
+            echo "label=$CHALLENGES" >> "$GITHUB_OUTPUT"
           fi
 
+      # No challenge arguments means "every challenge" - see update_scoreboards.py.
       - name: Regenerate scoreboards
         if: steps.detect.outputs.has_changes == 'true'
         run: uv run python scripts/update_scoreboards.py ${{ steps.detect.outputs.challenges }}
@@ -74,10 +106,11 @@ jobs:
             exit 0
           fi
 
-          git commit -m "Update scoreboards for: ${{ steps.detect.outputs.challenges }}"
+          git commit -m "Update scoreboards for: ${{ steps.detect.outputs.label }}"
 
           MAX_RETRIES=5
           RETRY_COUNT=0
+          PUSHED=false
           while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
             git fetch origin main
             if ! git diff --quiet HEAD origin/main; then
@@ -85,12 +118,20 @@ jobs:
             fi
             if git push origin main; then
               echo "Successfully pushed changes"
+              PUSHED=true
               break
             fi
             RETRY_COUNT=$((RETRY_COUNT + 1))
             echo "Push failed, retrying ($RETRY_COUNT/$MAX_RETRIES)..."
             sleep $((RETRY_COUNT * 2))
           done
+
+          # Fail loudly: exiting 0 here would leave a green run with a stale
+          # scoreboard, which is indistinguishable from "nothing to do".
+          if [ "$PUSHED" != "true" ]; then
+            echo "Could not push the scoreboard update after $MAX_RETRIES attempts"
+            exit 1
+          fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -99,4 +140,4 @@ jobs:
         run: |
           echo "## Scoreboards Updated" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "Challenges: ${{ steps.detect.outputs.challenges }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Challenges: ${{ steps.detect.outputs.label }}" >> "$GITHUB_STEP_SUMMARY"

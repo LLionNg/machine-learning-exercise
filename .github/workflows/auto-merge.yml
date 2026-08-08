@@ -11,6 +11,10 @@ on:
     - cron: '0 */2 * * *'
   workflow_dispatch:
 
+concurrency:
+  group: auto-merge
+  cancel-in-progress: false
+
 jobs:
   auto-merge:
     runs-on: ubuntu-latest
@@ -35,7 +39,7 @@ jobs:
             let mergeCount = 0;
             const changedChallenges = new Set();
 
-            const { data: prs } = await github.rest.pulls.list({
+            const prs = await github.paginate(github.rest.pulls.list, {
               owner: context.repo.owner,
               repo: context.repo.repo,
               state: 'open',
@@ -55,15 +59,27 @@ jobs:
                 continue;
               }
 
-              const { data: checks } = await github.rest.checks.listForRef({
+              // Paginate: a head sha can carry more check runs than one page,
+              // and missing the pr-status run would stall the PR forever.
+              const checkRuns = await github.paginate(github.rest.checks.listForRef, {
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                ref: pr.head.sha
+                ref: pr.head.sha,
+                per_page: 100
               });
 
-              const prStatusCheck = checks.check_runs.find(c => c.name === 'pr-status');
+              // A re-run leaves several pr-status runs on the same sha; only the
+              // newest one reflects the current state of the PR.
+              const prStatusCheck = checkRuns
+                .filter(c => c.name === 'pr-status')
+                .sort((a, b) => new Date(b.started_at || 0) - new Date(a.started_at || 0))[0];
+
               if (!prStatusCheck) {
                 console.log(`PR #${pr.number}: Skipping - no pr-status check found`);
+                continue;
+              }
+              if (prStatusCheck.status !== 'completed') {
+                console.log(`PR #${pr.number}: Skipping - pr-status is still '${prStatusCheck.status}'`);
                 continue;
               }
               if (prStatusCheck.conclusion !== 'success') {
@@ -103,10 +119,11 @@ jobs:
               console.log(`PR #${pr.number}: Merging - pr-status passed and wait period elapsed`);
 
               try {
-                const { data: files } = await github.rest.pulls.listFiles({
+                const files = await github.paginate(github.rest.pulls.listFiles, {
                   owner: context.repo.owner,
                   repo: context.repo.repo,
-                  pull_number: pr.number
+                  pull_number: pr.number,
+                  per_page: 100
                 });
 
                 for (const file of files) {
@@ -188,6 +205,7 @@ jobs:
 
           MAX_RETRIES=5
           RETRY_COUNT=0
+          PUSHED=false
           while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
             git fetch origin main
             if ! git diff --quiet HEAD origin/main; then
@@ -195,11 +213,19 @@ jobs:
             fi
             if git push origin main; then
               echo "Successfully pushed changes"
+              PUSHED=true
               break
             fi
             RETRY_COUNT=$((RETRY_COUNT + 1))
             echo "Push failed, retrying ($RETRY_COUNT/$MAX_RETRIES)..."
             sleep $((RETRY_COUNT * 2))
           done
+
+          # Fail loudly: exiting 0 here would leave a green run with a stale
+          # scoreboard, which is indistinguishable from "nothing to do".
+          if [ "$PUSHED" != "true" ]; then
+            echo "Could not push the scoreboard update after $MAX_RETRIES attempts"
+            exit 1
+          fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

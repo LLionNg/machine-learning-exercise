@@ -106,10 +106,16 @@ land via fork + PR and the repo automates the rest with GitHub Actions:
   wait), then regenerates scoreboards for the challenges it touched.
 - **`.github/workflows/update-scoreboards.yml`** - on any direct push to `main` under
   `challenge-*/submissions/**` (e.g. a maintainer merging manually), regenerates the affected
-  `SCOREBOARD.md` files via `scripts/update_scoreboards.py` and commits them back.
+  `SCOREBOARD.md` files via `scripts/update_scoreboards.py` and commits them back. It diffs the
+  whole pushed range, so submissions that arrive on the second parent of a merge commit are not
+  missed. Running it manually from the Actions tab with the challenge input left empty
+  regenerates every scoreboard - the repair path if one ever drifts.
 
 All three commit as `github-actions[bot]`; no extra secrets are needed beyond the default
 `GITHUB_TOKEN`.
+
+Your submission directory name is matched against your GitHub login case-insensitively, so
+`submissions/octocat/` and `submissions/Octocat/` are both accepted.
 
 ## Requirements
 
